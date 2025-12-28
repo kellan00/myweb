@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双轨制团队管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 60px; /* 为底部状态栏留空间 */
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .tree-node {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px;
+            border-left: 4px solid;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .tree-node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tree-node.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .tree-node.search-highlight {
+            animation: searchPulse 2s ease-in-out;
+        }
+        
+        @keyframes searchPulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 217, 61, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 217, 61, 0.3); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 217, 61, 0.7); }
+        }
+        
+        .tree-node.left {
+            border-color: #3b82f6;
+        }
+        
+        .tree-node.right {
+            border-color: #ef4444;
+        }
+        
+        .tree-node.root {
+            border-color: #10b981;
+        }
+        
+        .tree-children {
+            margin-left: 24px;
+            border-left: 2px dashed #e5e7eb;
+            padding-left: 16px;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .btn-secondary:hover {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .scale-105 {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen p-4">
+        <!-- Header -->
+        <header class="glass-morphism rounded-2xl p-6 mb-6 fade-in">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                        <i class="fas fa-network-wired text-blue-600"></i>
+                        双轨制团队管理系统
+                    </h1>
+                    <p class="text-gray-600 mt-2">可视化团队结构 | 动态成员管理 | 实时业绩追踪</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="saveToLocal()" class="btn-success">
+                        <i class="fas fa-save mr-2"></i>保存到电脑
+                    </button>
+                    <button onclick="loadFromLocal()" class="btn-secondary">
+                        <i class="fas fa-folder-open mr-2"></i>从电脑加载
+                    </button>
+                    <button onclick="exportData()" class="btn-secondary">
+                        <i class="fas fa-file-excel mr-2"></i>导出Excel
+                    </button>
+                    <button onclick="importData()" class="btn-primary">
+                        <i class="fas fa-file-excel mr-2"></i>导入Excel
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧：团队结构树 -->
+            <div class="lg:col-span-2 glass-morphism rounded-2xl p-6 fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-sitemap text-blue-600 mr-2"></i>
+                        团队结构图
+                    </h2>
+                    <div class="flex gap-2">
+                    <button onclick="expandAll()" class="btn-primary text-sm px-3 py-1">
+                        <i class="fas fa-plus mr-1"></i>展开
+                    </button>
+                    <button onclick="collapseAll()" class="btn-secondary text-sm px-3 py-1">
+                        <i class="fas fa-minus mr-1"></i>折叠
+                    </button>
+                    <button onclick="resetView()" class="btn-secondary text-sm px-3 py-1">
+                        <i class="fas fa-redo mr-1"></i>重置
+                    </button>
+                    <button onclick="clearSearch()" class="btn-secondary text-sm px-3 py-1">
+                        <i class="fas fa-eraser mr-1"></i>清空
+                    </button>
+                    </div>
+                </div>
+
+                <!-- 搜索框 -->
+                <div class="mb-6">
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="搜索成员姓名或ID，例如：龚涛" 
+                               class="form-input pr-24" 
+                               oninput="handleSearchInput(this.value)"
+                               onfocus="showSearchDropdown()"
+                               onblur="hideSearchDropdown()"
+                               onkeypress="handleSearchKeyPress(event)">
+                        <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+                            <button type="button" onclick="toggleSearchDropdown()" 
+                                    class="text-gray-400 hover:text-gray-600 p-1" title="展开/收起">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <button type="button" onclick="executeSearch()" 
+                                    class="text-blue-500 hover:text-blue-700 p-1" title="搜索">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        <div id="searchDropdown" class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50 hidden mt-1">
+                            <div class="p-2 border-b bg-gray-50">
+                                <div class="text-xs text-gray-500">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    按回车或点击搜索按钮查找成员
+                                </div>
+                            </div>
+                            <div id="searchOptions" class="max-h-40 overflow-y-auto">
+                                <!-- 动态生成的搜索选项 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 团队树 -->
+                <div id="treeContainer" class="max-h-96 overflow-y-auto">
+                    <!-- 动态生成的树结构 -->
+                </div>
+
+                <!-- 图例 -->
+                <div class="flex justify-center gap-6 mt-6 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-blue-500 rounded-full"></div>
+                        <span>左区团队</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-red-500 rounded-full"></div>
+                        <span>右区团队</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                        <span>根节点</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：成员信息和操作 -->
+            <div class="glass-morphism rounded-2xl p-6 fade-in">
+                <!-- 成员信息 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-user text-blue-600 mr-2"></i>
+                        成员信息
+                    </h3>
+                    <div id="memberInfo" class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">成员ID:</span>
+                            <span id="infoId" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">姓名:</span>
+                            <span id="infoName" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">级别:</span>
+                            <span id="infoLevel" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">推荐人:</span>
+                            <span id="infoParent" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">安置位置:</span>
+                            <span id="infoPlacement" class="font-medium">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计数据 -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="stat-card">
+                        <div class="text-2xl font-bold text-blue-600" id="leftTeamCount">0</div>
+                        <div class="text-sm text-gray-600">左区人数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-2xl font-bold text-red-600" id="rightTeamCount">0</div>
+                        <div class="text-sm text-gray-600">右区人数</div>
+                    </div>
+                </div>
+
+                <!-- 成员管理表单 -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-cog text-blue-600 mr-2"></i>
+                        成员管理
+                    </h3>
+                    <form id="memberForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">姓名 *</label>
+                            <input type="text" id="memberName" class="form-input" placeholder="请输入姓名" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">级别</label>
+                            <select id="memberLevel" class="form-input">
+                                <option value="会员">会员</option>
+                                <option value="中级会员">中级会员</option>
+                                <option value="高级会员">高级会员</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">推荐人</label>
+                            <div class="relative">
+                                <input type="text" id="parentSearch" class="form-input pr-10" 
+                                       placeholder="搜索推荐人姓名..." 
+                                       oninput="searchParent(this.value)"
+                                       onfocus="showParentDropdown()"
+                                       onblur="hideParentDropdown()">
+                                <button type="button" onclick="toggleParentDropdown()" 
+                                        class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <div id="parentDropdown" class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50 hidden">
+                                    <div class="p-2">
+                                        <input type="text" class="w-full p-2 border rounded" 
+                                               placeholder="搜索..." 
+                                               oninput="filterParentOptions(this.value)">
+                                    </div>
+                                    <div id="parentOptions" class="max-h-32 overflow-y-auto">
+                                        <!-- 动态生成的推荐人选项 -->
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="selectedParentId" value="">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">安置位置</label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center">
+                                    <input type="radio" name="placement" value="left" checked class="mr-2">
+                                    <span>左区</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio" name="placement" value="right" class="mr-2">
+                                    <span>右区</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio" name="placement" value="auto" class="mr-2">
+                                    <span>自动平衡</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-primary flex-1">
+                                <i class="fas fa-plus mr-2"></i>添加
+                            </button>
+                            <button type="button" onclick="editMember()" class="btn-secondary flex-1">
+                                <i class="fas fa-edit mr-2"></i>编辑
+                            </button>
+                            <button type="button" onclick="deleteMember()" class="btn-danger flex-1">
+                                <i class="fas fa-trash mr-2"></i>删除
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据分析 -->
+        <div class="glass-morphism rounded-2xl p-6 mt-6 fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
+                数据分析
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="stat-card">
+                    <div class="text-3xl font-bold text-green-600" id="totalMembers">0</div>
+                    <div class="text-sm text-gray-600">总成员数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-3xl font-bold text-purple-600" id="totalSenior">0</div>
+                    <div class="text-sm text-gray-600">高级会员</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-3xl font-bold text-orange-600" id="totalIntermediate">0</div>
+                    <div class="text-sm text-gray-600">中级会员</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-3xl font-bold text-teal-600" id="totalBasic">0</div>
+                    <div class="text-sm text-gray-600">会员</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-3xl font-bold text-teal-600" id="maxDepth">0</div>
+                    <div class="text-sm text-gray-600">最大层级</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 glass-morphism">
+        <div class="max-w-7xl mx-auto flex justify-between items-center text-sm">
+            <div class="flex items-center gap-4">
+                <span id="saveStatus" class="text-gray-600">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <span id="statusText">就绪</span>
+                </span>
+                <span id="lastSaveTime" class="text-gray-500">
+                    上次保存: <span id="saveTimeDisplay">未保存</span>
+                </span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="clearLocalData()" class="text-red-600 hover:text-red-800 text-sm">
+                    <i class="fas fa-trash mr-1"></i>清除本地数据
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 成员详情模态框 -->
+    <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 w-96 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">
+                    <i class="fas fa-user-circle text-blue-600 mr-2"></i>
+                    成员详细信息
+                </h3>
+                <button onclick="closeDetailModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div id="detailContent" class="space-y-4">
+                <!-- 动态生成的详细内容 -->
+            </div>
+            
+            <div class="flex gap-2 pt-4">
+                <button onclick="selectDetailMember()" class="btn-primary flex-1">
+                    <i class="fas fa-mouse-pointer mr-2"></i>选中
+                </button>
+                <button onclick="closeDetailModal()" class="btn-secondary flex-1">
+                    <i class="fas fa-times mr-2"></i>关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑成员模态框 -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 w-96 max-h-screen overflow-y-auto">
+            <h3 class="text-lg font-bold mb-4">
+                <i class="fas fa-user-edit text-blue-600 mr-2"></i>
+                编辑成员信息
+            </h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">姓名 *</label>
+                    <input type="text" id="editName" class="form-input" placeholder="请输入姓名">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">会员级别</label>
+                    <select id="editLevel" class="form-input">
+                        <option value="会员">会员</option>
+                        <option value="中级会员">中级会员</option>
+                        <option value="高级会员">高级会员</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">推荐人</label>
+                    <div class="relative">
+                        <input type="text" id="editParentSearch" class="form-input pr-10" 
+                               placeholder="搜索推荐人..." 
+                               oninput="searchEditParent(this.value)">
+                        <input type="hidden" id="editSelectedParentId" value="">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">安置位置</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="editPlacement" value="left" class="mr-2">
+                            <span>左区</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="editPlacement" value="right" class="mr-2">
+                            <span>右区</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 pt-4">
+                    <button onclick="saveEditMember()" class="btn-primary flex-1">
+                        <i class="fas fa-save mr-2"></i>保存
+                    </button>
+                    <button onclick="closeEditModal()" class="btn-secondary flex-1">
+                        <i class="fas fa-times mr-2"></i>取消
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleFileImport(event)">
+
+    <script>
+        // 全局数据
+        let teamData = {
+            id: "1000",
+            name: "张三",
+            level: "高级会员",
+            leftTeamSize: 2,
+            rightTeamSize: 2,
+            parentId: null,
+            placement: "root",
+            children: [
+                {
+                    id: "1001",
+                    name: "李四",
+                    level: "中级会员",
+                    leftTeamSize: 1,
+                    rightTeamSize: 0,
+                    parentId: "1000",
+                    placement: "left",
+                    children: [
+                        {
+                            id: "1003",
+                            name: "王五",
+                            level: "会员",
+                            leftTeamSize: 0,
+                            rightTeamSize: 0,
+                            parentId: "1001",
+                            placement: "left",
+                            children: []
+                        }
+                    ]
+                },
+                {
+                    id: "1002",
+                    name: "赵六",
+                    level: "中级会员",
+                    leftTeamSize: 0,
+                    rightTeamSize: 1,
+                    parentId: "1000",
+                    placement: "right",
+                    children: [
+                        {
+                            id: "1004",
+                            name: "孙七",
+                            level: "会员",
+                            leftTeamSize: 0,
+                            rightTeamSize: 1,
+                            parentId: "1002",
+                            placement: "right",
+                            children: [
+                                {
+                                    id: "1005",
+                                    name: "龚涛",
+                                    level: "中级会员",
+                                    leftTeamSize: 0,
+                                    rightTeamSize: 0,
+                                    parentId: "1004",
+                                    placement: "right",
+                                    children: []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        let selectedNode = null;
+        let allMembers = [];
+        let expandedNodes = {};
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 尝试从本地存储加载数据
+            loadFromLocal(true);
+            
+            renderTree();
+            collectAllMembers();
+            updateParentSelect();
+            updateStatistics();
+            selectNode(teamData);
+            
+            // 初始化展开状态
+            initializeExpandedNodes();
+            
+            // 添加自动保存功能
+            setInterval(autoSave, 30000); // 每30秒自动保存一次
+        });
+
+        // 收集所有成员
+        function collectAllMembers() {
+            allMembers = [];
+            function traverse(node) {
+                allMembers.push({
+                    id: node.id,
+                    name: node.name,
+                    level: node.level
+                });
+                
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(child => traverse(child));
+                }
+            }
+            traverse(teamData);
+        }
+
+        // 渲染树结构
+        function renderTree(filterText = '') {
+            const container = document.getElementById('treeContainer');
+            const html = renderNode(teamData, 0, filterText);
+            container.innerHTML = html;
+        }
+
+        // 递归渲染节点
+        function renderNode(node, level, filterText) {
+            const isExpanded = expandedNodes[node.id] === true;
+            const isMatch = filterText && (
+                node.name.toLowerCase().includes(filterText.toLowerCase()) ||
+                node.id.includes(filterText)
+            );
+            
+            let html = `
+                <div class="tree-node ${node.placement} ${selectedNode?.id === node.id ? 'selected' : ''} ${isMatch ? 'ring-2 ring-yellow-400' : ''}" 
+                     onclick="selectNode(${JSON.stringify(node).replace(/"/g, '&quot;')})" 
+                     style="margin-left: ${level * 20}px;">
+                    <div class="flex justify-between items-center">
+                        <div class="flex-1">
+                            <div class="font-bold">${node.name}</div>
+                            <div class="text-sm opacity-75">ID: ${node.id} | ${node.level}</div>
+                            <div class="text-xs opacity-60">左区: ${node.leftTeamSize}人 | 右区: ${node.rightTeamSize}人</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${isMatch ? `
+                                <button onclick="event.stopPropagation(); showMemberDetail('${node.id}')" 
+                                        class="text-sm px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                    <i class="fas fa-info-circle"></i> 详情
+                                </button>
+                            ` : ''}
+                            ${node.children && node.children.length > 0 ? `
+                                <button onclick="event.stopPropagation(); toggleNode('${node.id}')" class="text-sm px-2 py-1 bg-gray-200 rounded">
+                                    ${isExpanded ? '<i class="fas fa-chevron-down"></i>' : '<i class="fas fa-chevron-right"></i>'}
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (node.children && node.children.length > 0 && isExpanded) {
+                html += '<div class="tree-children">';
+                node.children.forEach(child => {
+                    html += renderNode(child, level + 1, filterText);
+                });
+                html += '</div>';
+            }
+            
+            return html;
+        }
+
+        // 切换节点展开/折叠
+        function toggleNode(nodeId) {
+            expandedNodes[nodeId] = !expandedNodes[nodeId];
+            renderTree();
+        }
+
+        // 展开全部
+        function expandAll() {
+            function setExpanded(node) {
+                expandedNodes[node.id] = true;
+                if (node.children) {
+                    node.children.forEach(setExpanded);
+                }
+            }
+            setExpanded(teamData);
+            renderTree();
+        }
+
+        // 折叠全部
+        function collapseAll() {
+            function setCollapsed(node) {
+                expandedNodes[node.id] = false;
+                if (node.children) {
+                    node.children.forEach(setCollapsed);
+                }
+            }
+            setCollapsed(teamData);
+            renderTree();
+        }
+
+        // 清空搜索
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            renderTree('');
+            showNotification('搜索已清空', 'info');
+        }
+
+        // 重置视图
+        function resetView() {
+            expandedNodes = {};
+            selectedNode = null;
+            document.getElementById('searchInput').value = '';
+            renderTree();
+            selectNode(teamData);
+        }
+
+        // 初始化展开状态
+        function initializeExpandedNodes() {
+            // 只展开前两层，避免界面过于复杂
+            function initExpand(node, level = 0) {
+                expandedNodes[node.id] = level < 2; // 只展开前两层
+                if (node.children) {
+                    node.children.forEach(child => initExpand(child, level + 1));
+                }
+            }
+            initExpand(teamData);
+        }
+
+        // 处理搜索输入
+        function handleSearchInput(searchText) {
+            // 如果输入为空，清空下拉框
+            if (!searchText || searchText.trim() === '') {
+                document.getElementById('searchDropdown').classList.add('hidden');
+                renderTree('');
+                return;
+            }
+            
+            // 显示下拉框并过滤选项
+            showSearchDropdown();
+            filterSearchOptions(searchText);
+        }
+
+        // 处理回车键
+        function handleSearchKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                executeSearch();
+            }
+        }
+
+        // 执行搜索
+        function executeSearch() {
+            const searchText = document.getElementById('searchInput').value.trim();
+            
+            console.log('=== 开始搜索 ===');
+            console.log('搜索文本:', searchText);
+            console.log('当前团队数据:', JSON.stringify(teamData, null, 2));
+            
+            if (!searchText) {
+                showNotification('请输入搜索内容', 'info');
+                return;
+            }
+            
+            // 隐藏下拉框
+            document.getElementById('searchDropdown').classList.add('hidden');
+            
+            // 搜索成员
+            const matchedMember = findMemberBySearch(searchText);
+            
+            console.log('搜索结果:', matchedMember ? matchedMember.name : 'null');
+            
+            if (matchedMember) {
+                console.log('找到成员，开始处理...');
+                
+                // 设置搜索框值为匹配的成员名字
+                document.getElementById('searchInput').value = matchedMember.name;
+                
+                // 展开到该成员的路径
+                const expandSuccess = expandToMember(matchedMember.id);
+                
+                if (expandSuccess) {
+                    // 立即渲染树结构
+                    renderTree('');
+                    
+                    // 短暂延迟后选择和滚动
+                    setTimeout(() => {
+                        console.log('开始选择和滚动到成员');
+                        selectNode(matchedMember, true); // 跳过渲染，避免覆盖视觉效果
+                        scrollToMember(matchedMember.id);
+                        
+                        // 获取并显示详细的位置信息和识别结果
+                        const memberPath = getMemberPath(matchedMember.id);
+                        showDetailedLocationNotification(matchedMember, memberPath, searchText);
+                    }, 50);
+                } else {
+                    showNotification('无法展开到该成员', 'error');
+                }
+            } else {
+                console.log('未找到成员，显示错误通知');
+                // 显示未找到的详细提示
+                showNotFoundNotification(searchText);
+            }
+        }
+
+        // 显示搜索下拉框
+        function showSearchDropdown() {
+            updateSearchOptions();
+            document.getElementById('searchDropdown').classList.remove('hidden');
+        }
+
+        // 隐藏搜索下拉框
+        function hideSearchDropdown() {
+            setTimeout(() => {
+                document.getElementById('searchDropdown').classList.add('hidden');
+            }, 200);
+        }
+
+        // 切换搜索下拉框
+        function toggleSearchDropdown() {
+            const dropdown = document.getElementById('searchDropdown');
+            if (dropdown.classList.contains('hidden')) {
+                showSearchDropdown();
+            } else {
+                hideSearchDropdown();
+            }
+        }
+
+        // 更新搜索选项
+        function updateSearchOptions() {
+            const searchOptions = document.getElementById('searchOptions');
+            searchOptions.innerHTML = '';
+            
+            allMembers.forEach(member => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'p-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors';
+                optionDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-800">${member.name}</div>
+                            <div class="text-sm text-gray-600">ID: ${member.id} | ${member.level}</div>
+                        </div>
+                        <div class="px-2 py-1 text-xs rounded ${
+                            member.level === '高级会员' ? 'bg-purple-100 text-purple-800' :
+                            member.level === '中级会员' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                        }">
+                            ${member.level}
+                        </div>
+                    </div>
+                `;
+                optionDiv.onclick = () => selectSearchMember(member.id, member.name);
+                searchOptions.appendChild(optionDiv);
+            });
+        }
+
+        // 过滤搜索选项
+        function filterSearchOptions(searchText) {
+            const searchOptions = document.getElementById('searchOptions');
+            const options = searchOptions.children;
+            const lowerSearch = searchText.toLowerCase().trim();
+            
+            let hasVisibleOptions = false;
+            let firstMatchedOption = null;
+            
+            Array.from(options).forEach(option => {
+                const text = option.textContent.toLowerCase();
+                const match = text.includes(lowerSearch);
+                option.style.display = match ? "block" : "none";
+                if (match) {
+                    hasVisibleOptions = true;
+                    if (!firstMatchedOption) {
+                        firstMatchedOption = option;
+                        option.classList.add('bg-blue-50', 'border-l-4', 'border-blue-500');
+                    } else {
+                        option.classList.remove('bg-blue-50', 'border-l-4', 'border-blue-500');
+                    }
+                } else {
+                    option.classList.remove('bg-blue-50', 'border-l-4', 'border-blue-500');
+                }
+            });
+            
+            // 如果没有匹配的选项，显示提示
+            if (!hasVisibleOptions && lowerSearch !== '') {
+                searchOptions.innerHTML = `
+                    <div class="p-4 text-center text-gray-500">
+                        <i class="fas fa-search mb-2"></i>
+                        <div>未找到匹配的成员</div>
+                    </div>
+                `;
+            }
+        }
+
+        // 选择搜索成员
+        function selectSearchMember(id, name) {
+            document.getElementById('searchInput').value = name;
+            document.getElementById('searchDropdown').classList.add('hidden');
+            
+            // 执行搜索和跳转
+            const member = findNodeById(teamData, id);
+            if (member) {
+                // 展开到该成员的完整路径
+                const expandSuccess = expandToMember(member.id);
+                
+                if (expandSuccess) {
+                    // 立即渲染树结构
+                    renderTree('');
+                    
+                    // 短暂延迟后选择和滚动
+                    setTimeout(() => {
+                        selectNode(member, true); // 跳过渲染
+                        scrollToMember(member.id);
+                        
+                        // 显示详细的位置信息
+                        const memberPath = getMemberPath(id);
+                        showLocationNotification(member, memberPath);
+                    }, 50);
+                } else {
+                    showNotification('无法展开到该成员', 'error');
+                }
+            }
+        }
+
+        // 显示详细的位置通知和识别结果
+        function showDetailedLocationNotification(member, path, searchText) {
+            // 创建详细的识别结果通知
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white bg-green-500 fade-in z-50 max-w-md';
+            
+            // 判断匹配类型
+            const isExactMatch = member.name.toLowerCase() === searchText.toLowerCase();
+            const isIdMatch = member.id === searchText.trim();
+            let matchType = '模糊匹配';
+            if (isExactMatch) matchType = '精确匹配';
+            else if (isIdMatch) matchType = 'ID匹配';
+            
+            notification.innerHTML = `
+                <div class="flex items-start">
+                    <i class="fas fa-check-circle mr-3 mt-1 text-2xl"></i>
+                    <div class="flex-1">
+                        <div class="font-bold text-lg mb-2">✅ 成功找到成员</div>
+                        <div class="bg-white bg-opacity-20 rounded p-3 mb-2">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-medium">姓名:</span>
+                                <span class="font-bold">${member.name}</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-medium">ID:</span>
+                                <span class="font-bold">${member.id}</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-medium">级别:</span>
+                                <span class="font-bold">${member.level}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">匹配方式:</span>
+                                <span class="bg-yellow-400 text-gray-800 px-2 py-1 rounded text-xs font-bold">${matchType}</span>
+                            </div>
+                        </div>
+                        <div class="text-xs">
+                            <div class="font-medium mb-1">📍 团队位置:</div>
+                            <div class="bg-white bg-opacity-20 rounded p-2">${path}</div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="absolute top-2 right-2 text-white opacity-70 hover:opacity-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 6秒后自动移除
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            document.body.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 6000);
+        }
+
+        // 显示未找到通知
+        function showNotFoundNotification(searchText) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white bg-red-500 fade-in z-50 max-w-md';
+            
+            // 获取现有成员列表
+            const memberList = allMembers.map(m => `${m.name}(${m.id})`).slice(0, 8).join(', ');
+            const moreText = allMembers.length > 8 ? '...' : '';
+            
+            notification.innerHTML = `
+                <div class="flex items-start">
+                    <i class="fas fa-exclamation-triangle mr-3 mt-1 text-xl"></i>
+                    <div>
+                        <div class="font-bold text-lg mb-2">❌ 未找到匹配的成员</div>
+                        <div class="bg-white bg-opacity-20 rounded p-3 mb-2">
+                            <div class="mb-2">
+                                <span class="font-medium">搜索内容:</span>
+                                <span class="font-bold">"${searchText}"</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">现有成员:</span>
+                                <div class="text-xs mt-1 opacity-90">${memberList}${moreText}</div>
+                            </div>
+                        </div>
+                        <div class="text-xs">
+                            💡 提示：请检查姓名是否正确，或尝试输入成员ID
+                        </div>
+                    </div>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="absolute top-2 right-2 text-white opacity-70 hover:opacity-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 5秒后自动移除
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            document.body.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        }
+
+        // 显示位置通知（保留原有功能）
+        function showLocationNotification(member, path) {
+            // 创建详细的位置信息通知
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white bg-blue-500 fade-in z-50 max-w-md';
+            notification.innerHTML = `
+                <div class="flex items-start">
+                    <i class="fas fa-map-marker-alt mr-3 mt-1 text-xl"></i>
+                    <div>
+                        <div class="font-bold text-lg mb-1">已定位到: ${member.name}</div>
+                        <div class="text-sm opacity-90 mb-2">ID: ${member.id} | 级别: ${member.level}</div>
+                        <div class="text-xs bg-white bg-opacity-20 rounded p-2">
+                            <div class="font-medium mb-1">团队路径:</div>
+                            <div class="opacity-90">${path}</div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="absolute top-2 right-2 text-white opacity-70 hover:opacity-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 5秒后自动移除
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            document.body.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        }
+
+        // 搜索成员
+        function searchMembers(searchText) {
+            if (!searchText || searchText.trim() === '') {
+                renderTree('');
+                return;
+            }
+            
+            // 查找第一个匹配的成员
+            const matchedMember = findMemberBySearch(searchText);
+            
+            if (matchedMember) {
+                // 展开到该成员的路径
+                expandToMember(matchedMember.id);
+                // 渲染完整树
+                renderTree('');
+                // 高亮并选中该成员
+                setTimeout(() => {
+                    selectNode(matchedMember);
+                    // 滚动到该成员位置
+                    scrollToMember(matchedMember.id);
+                    showNotification(`已找到: ${matchedMember.name} (${matchedMember.id})`, 'success');
+                }, 100);
+            } else {
+                renderTree(searchText);
+                showNotification('未找到匹配的成员', 'error');
+            }
+        }
+
+        // 根据搜索条件查找成员
+        function findMemberBySearch(searchText) {
+            const lowerSearch = searchText.toLowerCase().trim();
+            const exactSearch = searchText.trim();
+            
+            console.log('=== 开始搜索成员 ===');
+            console.log('搜索文本:', searchText);
+            console.log('当前团队成员:', allMembers.map(m => `${m.name}(${m.id})`).join(', '));
+            
+            let foundMember = null;
+            let exactMatches = [];
+            let partialMatches = [];
+            
+            function search(node) {
+                console.log('检查节点:', node.name, 'ID:', node.id);
+                
+                // 收集所有匹配的成员
+                if (node.name.toLowerCase() === lowerSearch) {
+                    console.log('✅ 完全匹配:', node.name);
+                    exactMatches.push(node);
+                } else if (node.name.toLowerCase().includes(lowerSearch)) {
+                    console.log('🔄 部分匹配:', node.name);
+                    partialMatches.push(node);
+                }
+                
+                if (node.id === exactSearch) {
+                    console.log('🆔 ID匹配:', node.id);
+                    return node; // ID完全匹配立即返回
+                }
+                
+                // 递归搜索子节点
+                if (node.children && node.children.length > 0) {
+                    for (let child of node.children) {
+                        const found = search(child);
+                        if (found) return found;
+                    }
+                }
+                
+                return null;
+            }
+            
+            // 搜索团队数据
+            foundMember = search(teamData);
+            
+            console.log('搜索统计 - 完全匹配:', exactMatches.length, '部分匹配:', partialMatches.length);
+            
+            // 如果没有ID匹配，优先返回完全匹配姓名的
+            if (!foundMember && exactMatches.length > 0) {
+                foundMember = exactMatches[0];
+                console.log('🎯 使用完全匹配:', foundMember.name);
+            }
+            
+            // 无论字符长度如何，只要有部分匹配就返回
+            if (!foundMember && partialMatches.length > 0) {
+                foundMember = partialMatches[0];
+                console.log('🔍 使用部分匹配:', foundMember.name);
+            }
+            
+            console.log('📍 最终返回:', foundMember ? `${foundMember.name}(${foundMember.id})` : 'null');
+            return foundMember;
+        }
+
+        // 展开到指定成员的路径
+        function expandToMember(memberId) {
+            console.log('开始展开到成员:', memberId);
+            
+            // 收集从根节点到目标成员的路径
+            function findPath(node, targetId, currentPath) {
+                console.log('查找路径 - 当前节点:', node.name, '目标ID:', targetId, '当前路径:', currentPath);
+                
+                if (node.id === targetId) {
+                    console.log('找到目标节点:', node.name);
+                    return [...currentPath, node.id];
+                }
+                
+                if (node.children) {
+                    for (let child of node.children) {
+                        const foundPath = findPath(child, targetId, [...currentPath, node.id]);
+                        if (foundPath) return foundPath;
+                    }
+                }
+                
+                return null;
+            }
+            
+            const memberPath = findPath(teamData, memberId);
+            
+            console.log('最终展开路径:', memberPath);
+            console.log('当前展开状态:', expandedNodes);
+            
+            if (memberPath) {
+                // 展开路径上的所有节点
+                memberPath.forEach(nodeId => {
+                    expandedNodes[nodeId] = true;
+                    console.log('展开节点:', nodeId);
+                });
+                
+                console.log('更新后的展开状态:', expandedNodes);
+                console.log('展开的节点路径:', memberPath);
+                
+                // 不在这里渲染，让调用者控制渲染时机
+                console.log('路径展开完成，等待渲染');
+                return true;
+            } else {
+                console.log('未找到路径到成员:', memberId);
+                return false;
+            }
+        }
+
+        // 滚动到指定成员
+        function scrollToMember(memberId) {
+            // 查找DOM元素
+            const allNodes = document.querySelectorAll('.tree-node');
+            
+            for (let nodeElement of allNodes) {
+                const onclickAttr = nodeElement.getAttribute('onclick');
+                if (onclickAttr && onclickAttr.includes(memberId)) {
+                    // 滚动到该元素
+                    nodeElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    
+                    // 添加更强的视觉标识效果
+                    nodeElement.classList.add('ring-4', 'ring-yellow-400', 'ring-offset-2', 'scale-105', 'shadow-xl');
+                    
+                    // 添加位置指示器
+                    const indicator = document.createElement('div');
+                    indicator.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 animate-pulse';
+                    indicator.innerHTML = '<i class="fas fa-map-pin"></i>';
+                    nodeElement.style.position = 'relative';
+                    nodeElement.appendChild(indicator);
+                    
+                    // 3秒后移除效果
+                    setTimeout(() => {
+                        nodeElement.classList.remove('ring-4', 'ring-yellow-400', 'ring-offset-2', 'scale-105', 'shadow-xl');
+                        if (indicator.parentElement) {
+                            indicator.parentElement.removeChild(indicator);
+                        }
+                    }, 3000);
+                    
+                    break;
+                }
+            }
+        }
+
+        // 选择节点
+        function selectNode(node, skipRender = false) {
+            selectedNode = node;
+            updateMemberInfo(node);
+            if (!skipRender) {
+                renderTree('');
+            }
+            updateParentSelect();
+        }
+
+        // 更新成员信息
+        function updateMemberInfo(member) {
+            document.getElementById("infoId").textContent = member.id;
+            document.getElementById("infoName").textContent = member.name;
+            document.getElementById("infoLevel").textContent = member.level;
+            document.getElementById("infoParent").textContent = member.parentId || "无";
+            document.getElementById("infoPlacement").textContent = 
+                member.placement === "left" ? "左区" : 
+                member.placement === "right" ? "右区" : "根节点";
+            
+            document.getElementById("leftTeamCount").textContent = member.leftTeamSize;
+            document.getElementById("rightTeamCount").textContent = member.rightTeamSize;
+        }
+
+        // 更新推荐人选择
+        function updateParentSelect() {
+            updateParentOptions();
+            
+            // 只有当有选中的节点且不是在添加新成员时才更新推荐人
+            if (selectedNode && document.getElementById("memberForm").style.display !== 'none') {
+                console.log('更新推荐人选择框为当前选中节点:', selectedNode.name);
+                document.getElementById("selectedParentId").value = selectedNode.id;
+                document.getElementById("parentSearch").value = selectedNode.name;
+            }
+        }
+
+        // 更新推荐人选项
+        function updateParentOptions() {
+            const parentOptions = document.getElementById("parentOptions");
+            parentOptions.innerHTML = '';
+            
+            allMembers.forEach(member => {
+                const optionDiv = document.createElement("div");
+                optionDiv.className = "p-2 hover:bg-gray-100 cursor-pointer border-b";
+                optionDiv.innerHTML = `
+                    <div class="font-medium">${member.name}</div>
+                    <div class="text-sm text-gray-600">ID: ${member.id} | ${member.level}</div>
+                `;
+                optionDiv.onclick = () => selectParent(member.id, member.name);
+                parentOptions.appendChild(optionDiv);
+            });
+        }
+
+        // 显示推荐人下拉框
+        function showParentDropdown() {
+            document.getElementById("parentDropdown").classList.remove("hidden");
+            updateParentOptions();
+        }
+
+        // 隐藏推荐人下拉框
+        function hideParentDropdown() {
+            setTimeout(() => {
+                document.getElementById("parentDropdown").classList.add("hidden");
+            }, 200);
+        }
+
+        // 切换推荐人下拉框
+        function toggleParentDropdown() {
+            const dropdown = document.getElementById("parentDropdown");
+            if (dropdown.classList.contains("hidden")) {
+                showParentDropdown();
+            } else {
+                hideParentDropdown();
+            }
+        }
+
+        // 搜索推荐人
+        function searchParent(searchText) {
+            showParentDropdown();
+            filterParentOptions(searchText);
+        }
+
+        // 过滤推荐人选项
+        function filterParentOptions(searchText) {
+            const parentOptions = document.getElementById("parentOptions");
+            const options = parentOptions.children;
+            
+            Array.from(options).forEach(option => {
+                const text = option.textContent.toLowerCase();
+                const match = text.includes(searchText.toLowerCase());
+                option.style.display = match ? "block" : "none";
+            });
+        }
+
+        // 选择推荐人
+        function selectParent(id, name) {
+            document.getElementById("selectedParentId").value = id;
+            document.getElementById("parentSearch").value = name;
+            hideParentDropdown();
+        }
+
+        // 搜索编辑推荐人
+        function searchEditParent(searchText) {
+            // 可以在这里添加搜索逻辑
+            const allParents = allMembers.filter(m => m.id !== selectedNode?.id);
+            const filtered = allParents.filter(m => 
+                m.name.toLowerCase().includes(searchText.toLowerCase()) ||
+                m.id.includes(searchText)
+            );
+            
+            if (filtered.length === 1) {
+                document.getElementById("editSelectedParentId").value = filtered[0].id;
+            }
+        }
+
+        // 查找节点
+        function findNodeById(node, id) {
+            if (node.id === id) return node;
+            
+            if (node.children) {
+                for (let child of node.children) {
+                    const found = findNodeById(child, id);
+                    if (found) return found;
+                }
+            }
+            
+            return null;
+        }
+
+        // 添加成员
+        document.getElementById("memberForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById("memberName").value.trim();
+            const level = document.getElementById("memberLevel").value;
+            const placement = document.querySelector('input[name="placement"]:checked').value;
+            
+            if (!name) {
+                showNotification('请输入成员姓名', 'error');
+                return;
+            }
+            
+            const parentId = document.getElementById("selectedParentId").value;
+            if (!parentId) {
+                showNotification('请选择推荐人', 'error');
+                return;
+            }
+            
+            const parentNode = findNodeById(teamData, parentId);
+            if (!parentNode) {
+                showNotification('未找到推荐人', 'error');
+                return;
+            }
+            
+            // 生成新ID
+            let newId = "1001";
+            if (allMembers.length > 0) {
+                const maxId = Math.max(...allMembers.map(m => parseInt(m.id)));
+                newId = String(maxId + 1);
+            }
+            
+            // 处理自动平衡
+            let finalPlacement = placement;
+            if (placement === "auto") {
+                finalPlacement = parentNode.leftTeamSize <= parentNode.rightTeamSize ? "left" : "right";
+            }
+            
+            const newMember = {
+                id: newId,
+                name: name,
+                level: level,
+                leftTeamSize: 0,
+                rightTeamSize: 0,
+                parentId: parentId,
+                placement: finalPlacement,
+                children: []
+            };
+            
+            if (!parentNode.children) parentNode.children = [];
+            parentNode.children.push(newMember);
+            
+            // 更新父节点统计
+            if (finalPlacement === "left") {
+                parentNode.leftTeamSize++;
+            } else if (finalPlacement === "right") {
+                parentNode.rightTeamSize++;
+            }
+            
+            // 重新渲染
+            collectAllMembers();
+            renderTree();
+            updateStatistics();
+            
+            // 选中新成员
+            setTimeout(() => {
+                selectNode(newMember);
+            }, 100);
+            
+            showNotification(`成员 ${name} 添加成功！`, 'success');
+            
+            // 重置表单但不清空推荐人信息，让用户看到刚才的选择
+            document.getElementById("memberName").value = "";
+            document.getElementById("memberLevel").value = "会员";
+            document.querySelector('input[name="placement"][value="left"]').checked = true;
+            
+            console.log(`✅ 成员 ${name} 已添加到推荐人 ${parentNode.name} (${parentId}) 下面`);
+            console.log('添加后的父节点状态:', {
+                name: parentNode.name,
+                id: parentNode.id,
+                leftTeamSize: parentNode.leftTeamSize,
+                rightTeamSize: parentNode.rightTeamSize,
+                childrenCount: parentNode.children ? parentNode.children.length : 0
+            });
+            
+            // 确保推荐人不会被后续操作覆盖
+            setTimeout(() => {
+                console.log('🔒 锁定推荐人选择框，防止被意外覆盖');
+                const selectedParentId = document.getElementById("selectedParentId");
+                const parentSearch = document.getElementById("parentSearch");
+                if (selectedParentId.value !== parentId) {
+                    console.warn('⚠️ 推荐人ID被意外改变，恢复中...');
+                    selectedParentId.value = parentId;
+                    parentSearch.value = parentNode.name;
+                }
+            }, 500);
+        });
+
+        // 编辑成员
+        function editMember() {
+            if (!selectedNode) {
+                showNotification('请先选择一个成员进行编辑', 'error');
+                return;
+            }
+            
+            if (selectedNode.id === "1000") {
+                showNotification("根节点不能编辑推荐人和安置位置！", 'error');
+                return;
+            }
+            
+            openEditModal();
+        }
+
+        // 打开编辑模态框
+        function openEditModal() {
+            if (!selectedNode) {
+                showNotification('请先选择一个成员进行编辑', 'error');
+                return;
+            }
+            
+            // 填充当前数据
+            document.getElementById("editName").value = selectedNode.name;
+            document.getElementById("editLevel").value = selectedNode.level;
+            document.getElementById("editSelectedParentId").value = selectedNode.parentId || "";
+            
+            // 查找并显示推荐人姓名
+            if (selectedNode.parentId) {
+                const parent = findNodeById(teamData, selectedNode.parentId);
+                if (parent) {
+                    document.getElementById("editParentSearch").value = parent.name;
+                }
+            }
+            
+            // 设置安置位置
+            const placementRadios = document.querySelectorAll('input[name="editPlacement"]');
+            placementRadios.forEach(radio => {
+                radio.checked = radio.value === selectedNode.placement;
+            });
+            
+            // 显示模态框
+            document.getElementById("editModal").classList.remove("hidden");
+        }
+
+        // 关闭编辑模态框
+        function closeEditModal() {
+            document.getElementById("editModal").classList.add("hidden");
+        }
+
+        // 保存编辑的成员
+        function saveEditMember() {
+            if (!selectedNode) {
+                showNotification('请先选择要编辑的成员', 'error');
+                return;
+            }
+            
+            const newName = document.getElementById("editName").value.trim();
+            const newLevel = document.getElementById("editLevel").value;
+            const newParentId = document.getElementById("editSelectedParentId").value;
+            const newPlacement = document.querySelector('input[name="editPlacement"]:checked')?.value;
+            
+            console.log('=== 开始保存编辑 ===');
+            console.log('原成员信息:', {
+                name: selectedNode.name,
+                level: selectedNode.level,
+                parentId: selectedNode.parentId,
+                placement: selectedNode.placement
+            });
+            console.log('新成员信息:', {
+                name: newName,
+                level: newLevel,
+                parentId: newParentId,
+                placement: newPlacement
+            });
+            
+            if (!newName) {
+                showNotification('请输入成员姓名', 'error');
+                return;
+            }
+            
+            // 检查推荐人是否是自己的下级
+            if (newParentId && isDescendant(selectedNode.id, newParentId)) {
+                showNotification('推荐人不能是自己的下级成员！', 'error');
+                return;
+            }
+            
+            // 获取原父节点
+            const oldParentId = selectedNode.parentId;
+            const oldPlacement = selectedNode.placement;
+            
+            // 更新成员基本信息（名称和级别）
+            const oldLevel = selectedNode.level;
+            selectedNode.name = newName;
+            selectedNode.level = newLevel;
+            
+            console.log('级别更新:', {
+                oldLevel: oldLevel,
+                newLevel: newLevel,
+                updateSuccess: selectedNode.level === newLevel
+            });
+            
+            // 处理推荐人和位置的变化
+            if (newParentId && newParentId !== oldParentId) {
+                console.log('推荐人发生变化，重新组织树结构');
+                
+                // 从旧父节点移除
+                if (oldParentId) {
+                    const oldParent = findNodeById(teamData, oldParentId);
+                    if (oldParent && oldParent.children) {
+                        const index = oldParent.children.findIndex(child => child.id === selectedNode.id);
+                        if (index > -1) {
+                            oldParent.children.splice(index, 1);
+                            if (oldPlacement === "left") {
+                                oldParent.leftTeamSize--;
+                            } else if (oldPlacement === "right") {
+                                oldParent.rightTeamSize--;
+                            }
+                            console.log(`从原推荐人 ${oldParent.name} 下移除`);
+                        }
+                    }
+                }
+                
+                // 添加到新父节点
+                const newParent = findNodeById(teamData, newParentId);
+                if (newParent) {
+                    selectedNode.parentId = newParentId;
+                    selectedNode.placement = newPlacement;
+                    if (!newParent.children) newParent.children = [];
+                    newParent.children.push(selectedNode);
+                    
+                    if (newPlacement === "left") {
+                        newParent.leftTeamSize++;
+                    } else if (newPlacement === "right") {
+                        newParent.rightTeamSize++;
+                    }
+                    console.log(`添加到新推荐人 ${newParent.name} 的${newPlacement === 'left' ? '左区' : '右区'}`);
+                }
+            } else {
+                // 推荐人没有变化，只需要更新安置位置
+                if (newPlacement !== oldPlacement) {
+                    selectedNode.placement = newPlacement;
+                    
+                    // 更新原父节点的统计
+                    if (oldParentId) {
+                        const oldParent = findNodeById(teamData, oldParentId);
+                        if (oldParent) {
+                            // 先减去旧位置
+                            if (oldPlacement === "left") {
+                                oldParent.leftTeamSize--;
+                            } else if (oldPlacement === "right") {
+                                oldParent.rightTeamSize--;
+                            }
+                            
+                            // 加上新位置
+                            if (newPlacement === "left") {
+                                oldParent.leftTeamSize++;
+                            } else if (newPlacement === "right") {
+                                oldParent.rightTeamSize++;
+                            }
+                            console.log(`更新安置位置从 ${oldPlacement} 到 ${newPlacement}`);
+                        }
+                    }
+                } else {
+                    console.log('推荐人和安置位置都没有变化');
+                }
+            }
+            
+            console.log('保存后的成员信息:', {
+                name: selectedNode.name,
+                level: selectedNode.level,
+                parentId: selectedNode.parentId,
+                placement: selectedNode.placement
+            });
+            
+            // 重新渲染
+            collectAllMembers();
+            renderTree();
+            
+            console.log('重新渲染后验证级别:', {
+                selectedNodeId: selectedNode.id,
+                currentLevel: selectedNode.level,
+                expectedLevel: newLevel,
+                isCorrect: selectedNode.level === newLevel
+            });
+            
+            // 在关闭模态框之前更新信息，确保选中节点没有被重置
+            updateMemberInfo(selectedNode);
+            updateStatistics();
+            closeEditModal();
+            
+            // 关闭模态框后再更新推荐人选择，避免干扰
+            updateParentSelect();
+            
+            showNotification("成员信息更新成功！", 'success');
+            
+            // 自动保存
+            setTimeout(autoSave, 1000);
+        }
+
+        // 检查是否是后代节点
+        function isDescendant(ancestorId, nodeId) {
+            function check(node) {
+                if (node.id === nodeId) return true;
+                if (node.children) {
+                    return node.children.some(child => check(child));
+                }
+                return false;
+            }
+            
+            const ancestor = findNodeById(teamData, ancestorId);
+            return ancestor ? check(ancestor) : false;
+        }
+
+        // 删除成员
+        function deleteMember() {
+            if (!selectedNode) {
+                showNotification('请先选择一个成员', 'error');
+                return;
+            }
+            
+            if (selectedNode.id === "1000") {
+                showNotification("不能删除根节点成员！", 'error');
+                return;
+            }
+            
+            if (selectedNode.children && selectedNode.children.length > 0) {
+                showNotification("该成员下有团队，不能删除！", 'error');
+                return;
+            }
+            
+            if (confirm(`确定要删除成员 ${selectedNode.name} 吗？`)) {
+                const parentId = selectedNode.parentId;
+                const parentNode = findNodeById(teamData, parentId);
+                
+                if (parentNode && parentNode.children) {
+                    const index = parentNode.children.findIndex(child => child.id === selectedNode.id);
+                    if (index > -1) {
+                        // 更新父节点统计
+                        if (selectedNode.placement === "left") {
+                            parentNode.leftTeamSize--;
+                        } else if (selectedNode.placement === "right") {
+                            parentNode.rightTeamSize--;
+                        }
+                        
+                        parentNode.children.splice(index, 1);
+                        selectedNode = null;
+                        collectAllMembers();
+                        renderTree();
+                        updateStatistics();
+                        selectNode(teamData);
+                        showNotification("成员删除成功！", 'success');
+                        
+                        // 自动保存
+                        setTimeout(autoSave, 1000);
+                    }
+                }
+            }
+        }
+
+        // 更新统计数据
+        function updateStatistics() {
+            let totalMembers = 0;
+            let totalSenior = 0;
+            let totalIntermediate = 0;
+            let totalBasic = 0;
+            let maxDepth = 0;
+            
+            function analyze(node, depth = 0) {
+                totalMembers++;
+                
+                if (node.level === '高级会员') {
+                    totalSenior++;
+                } else if (node.level === '中级会员') {
+                    totalIntermediate++;
+                } else if (node.level === '会员') {
+                    totalBasic++;
+                }
+                
+                maxDepth = Math.max(maxDepth, depth);
+                
+                if (node.children) {
+                    node.children.forEach(child => analyze(child, depth + 1));
+                }
+            }
+            
+            analyze(teamData);
+            
+            document.getElementById("totalMembers").textContent = totalMembers;
+            document.getElementById("totalSenior").textContent = totalSenior;
+            document.getElementById("totalIntermediate").textContent = totalIntermediate;
+            document.getElementById("totalBasic").textContent = totalBasic;
+            document.getElementById("maxDepth").textContent = maxDepth;
+        }
+
+        // 导出数据为Excel
+        function exportData() {
+            try {
+                // 准备Excel数据
+                const excelData = [];
+                
+                // 递归收集所有成员数据
+                function collectMemberData(node, level = 0, path = '') {
+                    const memberPath = path ? `${path} -> ${node.name}` : node.name;
+                    
+                    excelData.push({
+                        '成员ID': node.id,
+                        '姓名': node.name,
+                        '级别': node.level,
+                        '推荐人ID': node.parentId || '',
+                        '安置位置': node.placement === 'left' ? '左区' : node.placement === 'right' ? '右区' : '根节点',
+                        '左区团队人数': node.leftTeamSize,
+                        '右区团队人数': node.rightTeamSize,
+                        '团队总人数': node.leftTeamSize + node.rightTeamSize,
+                        '层级': level,
+                        '路径': memberPath
+                    });
+                    
+                    if (node.children && node.children.length > 0) {
+                        node.children.forEach(child => {
+                            collectMemberData(child, level + 1, memberPath);
+                        });
+                    }
+                }
+                
+                collectMemberData(teamData);
+                
+                // 创建工作簿
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                
+                // 设置列宽
+                const colWidths = [
+                    {wch: 10}, // 成员ID
+                    {wch: 15}, // 姓名
+                    {wch: 10}, // 级别
+                    {wch: 12}, // 推荐人ID
+                    {wch: 12}, // 安置位置
+                    {wch: 12}, // 左区团队人数
+                    {wch: 12}, // 右区团队人数
+                    {wch: 12}, // 团队总人数
+                    {wch: 8},  // 层级
+                    {wch: 30}  // 路径
+                ];
+                ws['!cols'] = colWidths;
+                
+                // 添加工作表到工作簿
+                XLSX.utils.book_append_sheet(wb, ws, "团队成员");
+                
+                // 创建统计信息工作表
+                const statsData = [
+                    {'统计项目': '总成员数', '数值': excelData.length},
+                    {'统计项目': '高级会员人数', '数值': excelData.filter(m => m.级别 === '高级会员').length},
+                    {'统计项目': '中级会员人数', '数值': excelData.filter(m => m.级别 === '中级会员').length},
+                    {'统计项目': '会员人数', '数值': excelData.filter(m => m.级别 === '会员').length},
+                    {'统计项目': '最大层级', '数值': Math.max(...excelData.map(m => m.层级)) + 1},
+                    {'统计项目': '导出时间', '数值': new Date().toLocaleString('zh-CN')}
+                ];
+                
+                const wsStats = XLSX.utils.json_to_sheet(statsData);
+                wsStats['!cols'] = [{wch: 15}, {wch: 15}];
+                XLSX.utils.book_append_sheet(wb, wsStats, "统计信息");
+                
+                // 生成Excel文件
+                const today = new Date();
+                const dateStr = today.getFullYear() + 
+                              String(today.getMonth() + 1).padStart(2, '0') + 
+                              String(today.getDate()).padStart(2, '0');
+                const fileName = `架构图_${dateStr}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                
+                showNotification('Excel文件导出成功！', 'success');
+            } catch (error) {
+                console.error('导出错误:', error);
+                showNotification('导出失败，请重试！', 'error');
+            }
+        }
+
+        // 导入数据
+        function importData() {
+            document.getElementById('fileInput').click();
+        }
+
+        // 处理Excel文件导入
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                showNotification('请选择Excel文件格式(.xlsx或.xls)！', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    // 读取第一个工作表
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    if (jsonData.length === 0) {
+                        showNotification('Excel文件为空！', 'error');
+                        return;
+                    }
+                    
+                    // 构建树结构
+                    const importedTeamData = buildTreeFromExcel(jsonData);
+                    
+                    if (!importedTeamData) {
+                        showNotification('Excel数据格式错误，请检查文件格式！', 'error');
+                        return;
+                    }
+                    
+                    // 更新数据
+                    teamData = importedTeamData;
+                    
+                    // 重置状态
+                    selectedNode = null;
+                    expandedNodes = {};
+                    
+                    // 重新渲染
+                    collectAllMembers();
+                    renderTree();
+                    updateParentSelect();
+                    updateStatistics();
+                    selectNode(teamData);
+                    
+                    showNotification('Excel数据导入成功！', 'success');
+                } catch (error) {
+                    console.error('导入错误:', error);
+                    showNotification('数据导入失败，请检查Excel文件格式！', 'error');
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+            // 清空input，允许重复选择同一文件
+            event.target.value = '';
+        }
+
+        // 从Excel数据构建树结构
+        function buildTreeFromExcel(excelData) {
+            // 查找根节点（安置位置为"根节点"或parentId为空）
+            let rootNode = excelData.find(item => 
+                item.安置位置 === '根节点' || 
+                !item.推荐人ID || 
+                item.推荐人ID === ''
+            );
+            
+            if (!rootNode) {
+                showNotification('未找到根节点，请确保Excel中有根节点数据！', 'error');
+                return null;
+            }
+            
+            // 创建节点映射
+            const nodeMap = new Map();
+            excelData.forEach(item => {
+                nodeMap.set(item.成员ID, {
+                    id: item.成员ID,
+                    name: item.姓名,
+                    level: item.级别,
+                    leftTeamSize: parseInt(item.左区团队人数) || 0,
+                    rightTeamSize: parseInt(item.右区团队人数) || 0,
+                    parentId: item.推荐人ID || null,
+                    placement: item.安置位置 === '左区' ? 'left' : 
+                               item.安置位置 === '右区' ? 'right' : 'root',
+                    children: []
+                });
+            });
+            
+            // 构建树结构
+            const root = nodeMap.get(rootNode.成员ID);
+            
+            nodeMap.forEach((node, id) => {
+                if (node.parentId && nodeMap.has(node.parentId)) {
+                    const parent = nodeMap.get(node.parentId);
+                    parent.children.push(node);
+                }
+            });
+            
+            return root;
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white fade-in z-50 ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                'bg-blue-500'
+            }`;
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${
+                        type === 'success' ? 'fa-check-circle' : 
+                        type === 'error' ? 'fa-exclamation-circle' : 
+                        'fa-info-circle'
+                    } mr-2"></i>
+                    ${message}
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // 保存到本地存储
+        function saveToLocal() {
+            try {
+                const saveData = {
+                    teamData: teamData,
+                    expandedNodes: expandedNodes,
+                    selectedNodeId: selectedNode ? selectedNode.id : null,
+                    saveTime: new Date().toISOString(),
+                    version: '1.0'
+                };
+                
+                localStorage.setItem('teamManagementData', JSON.stringify(saveData));
+                showNotification('数据已保存到本地存储！', 'success');
+                
+                // 更新保存状态
+                updateSaveStatus('手动保存成功', 'success');
+                document.getElementById('saveTimeDisplay').textContent = new Date().toLocaleTimeString('zh-CN');
+                
+                // 同时创建下载文件作为备份
+                createDownloadFile(saveData);
+                
+            } catch (error) {
+                console.error('保存失败:', error);
+                showNotification('保存失败，请检查浏览器存储权限！', 'error');
+            }
+        }
+
+        // 从本地存储加载
+        function loadFromLocal(silent = false) {
+            try {
+                const savedData = localStorage.getItem('teamManagementData');
+                
+                if (!savedData) {
+                    if (!silent) {
+                        showNotification('没有找到本地保存的数据！', 'error');
+                    }
+                    return false;
+                }
+                
+                const data = JSON.parse(savedData);
+                
+                // 验证数据完整性
+                if (!data.teamData || !data.teamData.id) {
+                    if (!silent) {
+                        showNotification('本地数据格式错误！', 'error');
+                    }
+                    return false;
+                }
+                
+                // 恢复数据
+                teamData = data.teamData;
+                expandedNodes = data.expandedNodes || {};
+                
+                // 如果有保存的选中节点，尝试恢复
+                if (data.selectedNodeId) {
+                    selectedNode = findNodeById(teamData, data.selectedNodeId);
+                }
+                
+                if (!silent) {
+                    const saveTime = data.saveTime ? new Date(data.saveTime).toLocaleString('zh-CN') : '未知时间';
+                    showNotification(`数据加载成功！保存时间：${saveTime}`, 'success');
+                    
+                    // 更新保存状态
+                    updateSaveStatus('数据加载成功', 'success');
+                    document.getElementById('saveTimeDisplay').textContent = saveTime.split(' ')[1] || saveTime;
+                }
+                
+                return true;
+                
+            } catch (error) {
+                console.error('加载失败:', error);
+                if (!silent) {
+                    showNotification('加载本地数据失败！', 'error');
+                }
+                return false;
+            }
+        }
+
+        // 创建下载文件
+        function createDownloadFile(saveData) {
+            try {
+                const dataStr = JSON.stringify(saveData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const today = new Date();
+                const dateStr = today.getFullYear() + 
+                              String(today.getMonth() + 1).padStart(2, '0') + 
+                              String(today.getDate()).padStart(2, '0');
+                const exportFileDefaultName = `架构图_${dateStr}.json`;
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                
+            } catch (error) {
+                console.error('创建下载文件失败:', error);
+            }
+        }
+
+        // 自动保存
+        function autoSave() {
+            try {
+                const saveData = {
+                    teamData: teamData,
+                    expandedNodes: expandedNodes,
+                    selectedNodeId: selectedNode ? selectedNode.id : null,
+                    saveTime: new Date().toISOString(),
+                    version: '1.0'
+                };
+                
+                localStorage.setItem('teamManagementData', JSON.stringify(saveData));
+                
+                // 更新保存状态
+                updateSaveStatus('已自动保存', 'success');
+                document.getElementById('saveTimeDisplay').textContent = new Date().toLocaleTimeString('zh-CN');
+                
+                console.log('自动保存完成:', new Date().toLocaleTimeString('zh-CN'));
+                
+            } catch (error) {
+                console.error('自动保存失败:', error);
+                updateSaveStatus('自动保存失败', 'error');
+            }
+        }
+
+        // 更新保存状态
+        function updateSaveStatus(message, type = 'info') {
+            const statusText = document.getElementById('statusText');
+            const saveStatus = document.getElementById('saveStatus');
+            
+            statusText.textContent = message;
+            
+            // 更新样式
+            saveStatus.className = type === 'success' ? 'text-green-600' : 
+                                 type === 'error' ? 'text-red-600' : 
+                                 'text-gray-600';
+            
+            // 3秒后恢复默认状态
+            setTimeout(() => {
+                statusText.textContent = '就绪';
+                saveStatus.className = 'text-gray-600';
+            }, 3000);
+        }
+
+        // 清除本地数据
+        function clearLocalData() {
+            if (confirm('确定要清除所有本地保存的数据吗？此操作不可恢复！')) {
+                localStorage.removeItem('teamManagementData');
+                showNotification('本地数据已清除！', 'success');
+                
+                // 重置为默认数据
+                teamData = {
+                    id: "1000",
+                    name: "张三",
+                    level: "高级会员",
+                    leftTeamSize: 0,
+                    rightTeamSize: 0,
+                    parentId: null,
+                    placement: "root",
+                    children: []
+                };
+                
+                selectedNode = null;
+                expandedNodes = {};
+                
+                collectAllMembers();
+                renderTree();
+                updateParentSelect();
+                updateStatistics();
+                selectNode(teamData);
+            }
+        }
+
+        // 初始化展开状态
+        expandedNodes[teamData.id] = true;
+        if (teamData.children) {
+            teamData.children.forEach(child => {
+                expandedNodes[child.id] = true;
+            });
+        }
+
+        // 当前查看详情的成员
+        let currentDetailMember = null;
+
+        // 显示成员详情
+        function showMemberDetail(memberId) {
+            const member = findNodeById(teamData, memberId);
+            if (!member) return;
+            
+            currentDetailMember = member;
+            
+            // 获取推荐人信息
+            let parentInfo = '无';
+            if (member.parentId) {
+                const parent = findNodeById(teamData, member.parentId);
+                if (parent) {
+                    parentInfo = `${parent.name} (ID: ${parent.id})`;
+                }
+            }
+            
+            // 获取子成员数量
+            const directChildrenCount = member.children ? member.children.length : 0;
+            
+            // 计算下级总数
+            let totalSubordinates = 0;
+            function countSubordinates(node) {
+                let count = 0;
+                if (node.children) {
+                    count += node.children.length;
+                    node.children.forEach(child => {
+                        count += countSubordinates(child);
+                    });
+                }
+                return count;
+            }
+            totalSubordinates = countSubordinates(member);
+            
+            // 获取完整路径
+            const memberPath = getMemberPath(memberId);
+            
+            // 生成详细内容
+            const detailContent = `
+                <div class="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-gray-600 text-sm">成员ID:</span>
+                            <div class="font-bold text-lg">${member.id}</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 text-sm">姓名:</span>
+                            <div class="font-bold text-lg">${member.name}</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 text-sm">会员级别:</span>
+                            <div class="font-bold text-lg">${member.level}</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 text-sm">安置位置:</span>
+                            <div class="font-bold text-lg">
+                                <span class="px-2 py-1 rounded ${member.placement === 'left' ? 'bg-blue-100 text-blue-800' : member.placement === 'right' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                                    ${member.placement === 'left' ? '左区' : member.placement === 'right' ? '右区' : '根节点'}
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 text-sm">推荐人:</span>
+                            <div class="font-bold">${parentInfo}</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 text-sm">直接下级:</span>
+                            <div class="font-bold">${directChildrenCount} 人</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 grid grid-cols-2 gap-4">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-blue-800 mb-2">团队统计</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>左区团队:</span>
+                                <span class="font-bold">${member.leftTeamSize} 人</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>右区团队:</span>
+                                <span class="font-bold">${member.rightTeamSize} 人</span>
+                            </div>
+                            <div class="flex justify-between font-bold text-lg">
+                                <span>团队总计:</span>
+                                <span>${member.leftTeamSize + member.rightTeamSize} 人</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>所有下级:</span>
+                                <span class="font-bold">${totalSubordinates} 人</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-green-800 mb-2">层级信息</h4>
+                        <div class="space-y-2 text-sm">
+                            <div>
+                                <span class="text-gray-600">完整路径:</span>
+                                <div class="font-bold mt-1 text-xs bg-gray-100 p-2 rounded">
+                                    ${memberPath}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('detailContent').innerHTML = detailContent;
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        // 获取成员路径
+        function getMemberPath(memberId) {
+            console.log('=== 获取成员路径 ===');
+            console.log('目标成员ID:', memberId);
+            
+            function buildPath(node, targetId, currentPath) {
+                console.log('构建路径 - 当前节点:', node.name, '目标:', targetId, '当前路径:', currentPath);
+                
+                if (node.id === targetId) {
+                    console.log('🎯 找到目标节点:', node.name);
+                    return [...currentPath, node.name];
+                }
+                
+                if (node.children) {
+                    console.log('遍历子节点数量:', node.children.length);
+                    for (let child of node.children) {
+                        const foundPath = buildPath(child, targetId, [...currentPath, node.name]);
+                        if (foundPath) return foundPath;
+                    }
+                }
+                
+                return null;
+            }
+            
+            const fullPath = buildPath(teamData, memberId, []);
+            const resultPath = fullPath ? fullPath.join(' → ') : '未找到';
+            
+            console.log('📍 最终路径:', resultPath);
+            console.log('所有路径节点:', fullPath);
+            
+            return resultPath;
+        }
+
+        // 选中详情中的成员
+        function selectDetailMember() {
+            if (currentDetailMember) {
+                selectNode(currentDetailMember);
+                closeDetailModal();
+            }
+        }
+
+        // 关闭详情模态框
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            currentDetailMember = null;
+        }
+
+        // 页面加载完成后的最终检查
+        console.log('系统初始化完成');
+        console.log('团队数据:', teamData);
+        console.log('所有成员:', allMembers);
+    </script>
+</body>
+</html>
